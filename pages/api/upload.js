@@ -8,7 +8,6 @@ export const config = {
   },
 };
 
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -23,14 +22,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Could not create upload directory' });
   }
 
-  // Use formidable.parse with options instead of new IncomingForm()
   const options = {
     multiples: false,
     uploadDir,
     keepExtensions: true,
   };
 
-  // Wrap formidable in a Promise to use async/await
   const formParse = () =>
     new Promise((resolve, reject) => {
       formidable(options).parse(req, (err, fields, files) => {
@@ -68,5 +65,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Upload failed' });
   }
 }
-
-
