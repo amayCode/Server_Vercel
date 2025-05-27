@@ -1,40 +1,67 @@
-import formidable from 'formidable';
+import { formidable } from 'formidable';
+import fs from 'fs';
 import path from 'path';
 
 export const config = {
   api: {
-    bodyParser: false, // Important: disable built-in body parser
+    bodyParser: false,
   },
 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const form = new formidable.IncomingForm({
-    uploadDir: '/tmp',  // temporary folder for files
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+
+  try {
+    await fs.promises.mkdir(uploadDir, { recursive: true });
+  } catch (mkdirErr) {
+    console.error('Error creating upload directory:', mkdirErr);
+    return res.status(500).json({ success: false, error: 'Could not create upload directory' });
+  }
+
+  const options = {
+    multiples: false,
+    uploadDir,
     keepExtensions: true,
-  });
+  };
 
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      console.error('Form parse error:', err);
-      return res.status(500).json({ success: false, error: 'Upload failed' });
-    }
+  const formParse = () =>
+    new Promise((resolve, reject) => {
+      formidable(options).parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve({ fields, files });
+      });
+    });
 
-    const file = files.file; // your input field name is "file"
+  try {
+    const { files } = await formParse();
 
-    if (!file) {
+    const fileField = files.file;
+    if (!fileField) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    const fileName = path.basename(file.filepath);
-    const downloadUrl = `${process.env.BASE_URL}/uploads/${fileName}`;
+    const file = Array.isArray(fileField) ? fileField[0] : fileField;
 
-    return res.status(200).json({
-      success: true,
-      downloadUrl,
-    });
-  });
+    const oldPath = file.filepath || file.path;
+    const filename = file.originalFilename || file.name;
+
+    if (!filename || !oldPath) {
+      return res.status(400).json({ success: false, error: 'Invalid file upload' });
+    }
+
+    const newPath = path.join(uploadDir, filename);
+
+    await fs.promises.rename(oldPath, newPath);
+
+    const downloadUrl = `/uploads/${filename}`;
+
+    return res.status(200).json({ success: true, downloadUrl });
+  } catch (err) {
+    console.error('Upload error:', err);
+    return res.status(500).json({ success: false, error: 'Upload failed' });
+  }
 }
