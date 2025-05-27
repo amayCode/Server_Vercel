@@ -28,7 +28,8 @@ export async function GET(request, { params }) {
     `, {
       headers: { 'Content-Type': 'text/html' },
     });
-  } catch (err) {
+  } catch {
+    // err parameter removed to fix lint error about unused variable
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 }
